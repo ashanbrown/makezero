@@ -1,4 +1,4 @@
 SHELL=bash
 
 test:
-	diff examples/expected_results.txt <(go run . -always ./examples 2>&1)
+	diff <(sed 's|CURDIR|$(CURDIR)|' examples/expected_results.txt) <(go run . -always ./examples 2>&1)
