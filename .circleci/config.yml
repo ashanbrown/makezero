@@ -3,7 +3,7 @@ version: 2
 jobs:
   build:
     docker:
-      - image: circleci/go:node
+      - image: circleci/go:12
     steps:
       - checkout
       - run: sudo apt-get -y -qq install python python-pip
