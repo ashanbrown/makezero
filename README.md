@@ -15,6 +15,7 @@ Similar to other Go static analysis tools (such as golint, go vet), makezero can
 
 ### Flags
 - **-set_exit_status** (default false) - Set exit status to 1 if any issues are found.
+- **-always** (default false) - Always require slices to be initialized with zero length, regardless of whether they are used with append.
 
 ## Purpose
 
@@ -24,8 +25,6 @@ To prevent bugs caused by initializing a slice with non-constant length and late
 Consider the case below:
 
 ```Go
-import "testing"
-
 func copyNumbers(nums []int) []int {
   values := make([]int, len(num)) // satisfy prealloc
   for _, n := range nums {
@@ -33,10 +32,28 @@ func copyNumbers(nums []int) []int {
   }
   return values 
 }
-
 ```
 
 In this case, you probably mean to preallocate with length 0 `values := make([]int, 0, len(num))`.
+
+The `-always` directive enforces that slice created with `make` always have initial length of zero.  This may sound
+draconian but it encourages the use of `append` when building up arrays rather than C-style code featuring the index
+variable `i` such as in:
+
+```Go
+func copyNumbers(nums []int) []int {
+  values := make([]int, len(num))
+  for i, n := range nums {
+    values[i] = n
+  }
+  return values 
+}
+
+```
+
+## Ignoring issues
+
+You can ignore a particular issue by including the directive `// nozero` on that line
 
 ## TODO
 

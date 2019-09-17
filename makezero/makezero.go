@@ -6,6 +6,7 @@ import (
 	"go/ast"
 	"go/token"
 	"log"
+	"regexp"
 )
 
 type AppendIssue struct {
@@ -33,6 +34,8 @@ type Issue interface {
 type visitor struct {
 	initLenMustBeZero bool
 
+	comments []*ast.CommentGroup // comments to apply during this visit
+
 	nonZeroLengthSliceDecls map[interface{}]interface{}
 	fset                    *token.FileSet
 	issues                  []Issue
@@ -49,15 +52,22 @@ func NewLinter(initialLengthMustBeZero bool) *Linter {
 }
 
 func (l Linter) Run(fset *token.FileSet, nodes ...ast.Node) ([]Issue, error) {
-	visitor := &visitor{
-		nonZeroLengthSliceDecls: make(map[interface{}]interface{}),
-		initLenMustBeZero:       l.initLenMustBeZero,
-		fset:                    fset,
-	}
+	var issues []Issue
 	for _, node := range nodes {
-		ast.Walk(visitor, node)
+		var comments []*ast.CommentGroup
+		if file, ok := node.(*ast.File); ok {
+			comments = file.Comments
+		}
+		visitor := visitor{
+			nonZeroLengthSliceDecls: make(map[interface{}]interface{}),
+			initLenMustBeZero:       l.initLenMustBeZero,
+			fset:                    fset,
+			comments:                comments,
+		}
+		ast.Walk(&visitor, node)
+		issues = append(issues, visitor.issues...)
 	}
-	return visitor.issues, nil
+	return issues, nil
 }
 
 func (v *visitor) Visit(node ast.Node) ast.Visitor {
@@ -67,7 +77,9 @@ func (v *visitor) Visit(node ast.Node) ast.Visitor {
 		if !ok || fun.Name != "append" {
 			break
 		}
-		if sliceIdent, ok := node.Args[0].(*ast.Ident); ok && v.hasNonZeroInitialLength(sliceIdent) {
+		if sliceIdent, ok := node.Args[0].(*ast.Ident); ok &&
+			v.hasNonZeroInitialLength(sliceIdent) &&
+			!v.hasNoLintOnSameLine(fun) {
 			v.issues = append(v.issues, AppendIssue{name: sliceIdent.Name, position: v.fset.Position(fun.Pos())})
 		}
 	case *ast.AssignStmt:
@@ -89,7 +101,7 @@ func (v *visitor) Visit(node ast.Node) ast.Visitor {
 					} else if lit, ok := right.Args[1].(*ast.BasicLit); ok && lit.Kind == token.INT && lit.Value == "0" {
 						break
 					}
-					if v.initLenMustBeZero {
+					if v.initLenMustBeZero && !v.hasNoLintOnSameLine(fun) {
 						v.issues = append(v.issues, MustHaveNonZeroInitLenIssue{name: left.Name, position: v.fset.Position(node.Pos())})
 					}
 					v.recordNonZeroLengthSlices(left)
@@ -121,6 +133,19 @@ func (v *visitor) isSlice(node ast.Node) bool {
 
 	if node, ok := node.(*ast.ArrayType); ok {
 		return node.Len == nil // only slices have zero length
+	}
+	return false
+}
+
+var nolint = regexp.MustCompile(`^\s*nozero\b`)
+
+func (v *visitor) hasNoLintOnSameLine(node ast.Node) bool {
+	nodePos := v.fset.Position(node.Pos())
+	for _, c := range v.comments {
+		commentPos := v.fset.Position(c.Pos())
+		if commentPos.Line == nodePos.Line && nolint.MatchString(c.Text()) {
+			return true
+		}
 	}
 	return false
 }
