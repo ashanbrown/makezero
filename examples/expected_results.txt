@@ -1,2 +1,2 @@
-slice "x" does not have non-zero initial length at /Users/andrewbrown/Projects/makezero/examples/example.go:6:2
-append to slice "x" with non-zero initialized length at /Users/andrewbrown/Projects/makezero/examples/example.go:7:2
+slice "x" does not have non-zero initial length at /home/circleci/project/examples/example.go:6:2
+append to slice "x" with non-zero initialized length at /home/circleci/project/examples/example.go:7:2
