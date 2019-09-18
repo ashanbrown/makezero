@@ -66,6 +66,17 @@ func foo() {
 		})
 
 	})
+
+	t.Run("ignores more complex constructs than basic variables", func(t *testing.T) {
+		linter := NewLinter(false)
+		expectIssues(t, linter, `
+package bar
+
+func foo() {
+	var x [][]int
+  x[0] = make([]int, 5)
+}`)
+	})
 }
 
 func expectIssues(t *testing.T, linter *Linter, contents string, issues ...string) {
@@ -83,7 +94,7 @@ func parseFile(t *testing.T, linter *Linter, contents string) []Issue {
 	if err != nil {
 		t.Fatalf("unable to parse file contents: %s", err)
 	}
-	issues, err := linter.Run(fset, expr)
+	issues, err := linter.Run(fset, nil, expr)
 	if err != nil {
 		t.Fatalf("unable to parse file: %s", err)
 	}

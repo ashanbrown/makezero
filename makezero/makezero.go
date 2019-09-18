@@ -2,9 +2,12 @@
 package makezero
 
 import (
+	"bytes"
 	"fmt"
 	"go/ast"
+	"go/printer"
 	"go/token"
+	"go/types"
 	"log"
 	"regexp"
 )
@@ -35,6 +38,7 @@ type visitor struct {
 	initLenMustBeZero bool
 
 	comments []*ast.CommentGroup // comments to apply during this visit
+	info     *types.Info
 
 	nonZeroLengthSliceDecls map[interface{}]interface{}
 	fset                    *token.FileSet
@@ -51,7 +55,7 @@ func NewLinter(initialLengthMustBeZero bool) *Linter {
 	}
 }
 
-func (l Linter) Run(fset *token.FileSet, nodes ...ast.Node) ([]Issue, error) {
+func (l Linter) Run(fset *token.FileSet, info *types.Info, nodes ...ast.Node) ([]Issue, error) {
 	var issues []Issue
 	for _, node := range nodes {
 		var comments []*ast.CommentGroup
@@ -61,6 +65,7 @@ func (l Linter) Run(fset *token.FileSet, nodes ...ast.Node) ([]Issue, error) {
 		visitor := visitor{
 			nonZeroLengthSliceDecls: make(map[interface{}]interface{}),
 			initLenMustBeZero:       l.initLenMustBeZero,
+			info:                    info,
 			fset:                    fset,
 			comments:                comments,
 		}
@@ -90,10 +95,7 @@ func (v *visitor) Visit(node ast.Node) ast.Visitor {
 				if !ok || fun.Name != "make" {
 					continue
 				}
-				left, ok := node.Lhs[i].(*ast.Ident)
-				if !ok {
-					log.Fatalf("unexpected left hand side: %v", left)
-				}
+				left := node.Lhs[i]
 				if len(right.Args) == 2 {
 					// ignore if not a slice or it has explicit zero length
 					if !v.isSlice(right.Args[0]) {
@@ -102,7 +104,7 @@ func (v *visitor) Visit(node ast.Node) ast.Visitor {
 						break
 					}
 					if v.initLenMustBeZero && !v.hasNoLintOnSameLine(fun) {
-						v.issues = append(v.issues, MustHaveNonZeroInitLenIssue{name: left.Name, position: v.fset.Position(node.Pos())})
+						v.issues = append(v.issues, MustHaveNonZeroInitLenIssue{name: v.textFor(left), position: v.fset.Position(node.Pos())})
 					}
 					v.recordNonZeroLengthSlices(left)
 				}
@@ -112,19 +114,40 @@ func (v *visitor) Visit(node ast.Node) ast.Visitor {
 	return v
 }
 
+func (v *visitor) textFor(node ast.Node) string {
+	typeBuf := new(bytes.Buffer)
+	if err := printer.Fprint(typeBuf, v.fset, node); err != nil {
+		log.Fatalf("ERROR: unable to print type: %s", err)
+	}
+	return typeBuf.String()
+}
+
 func (v *visitor) hasNonZeroInitialLength(ident *ast.Ident) bool {
 	_, exists := v.nonZeroLengthSliceDecls[ident.Obj.Decl]
 	return exists
 }
 
-func (v *visitor) recordNonZeroLengthSlices(ident *ast.Ident) {
+func (v *visitor) recordNonZeroLengthSlices(node ast.Node) {
+	ident, ok := node.(*ast.Ident)
+	if !ok {
+		return
+	}
 	v.nonZeroLengthSliceDecls[ident.Obj.Decl] = struct{}{}
 }
 
 func (v *visitor) isSlice(node ast.Node) bool {
 	// determine type if this is a user-defined type
 	if ident, ok := node.(*ast.Ident); ok {
-		spec, ok := ident.Obj.Decl.(*ast.TypeSpec)
+		obj := ident.Obj
+		if obj == nil {
+			if v.info != nil {
+				_, ok := v.info.ObjectOf(ident).Type().(*types.Slice)
+				return ok
+			} else {
+				return false
+			}
+		}
+		spec, ok := obj.Decl.(*ast.TypeSpec)
 		if !ok {
 			return false
 		}

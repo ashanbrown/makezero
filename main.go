@@ -39,7 +39,7 @@ func main() {
 		for _, n := range p.Syntax {
 			nodes = append(nodes, n)
 		}
-		newIssues, err := linter.Run(p.Fset, nodes...)
+		newIssues, err := linter.Run(p.Fset, p.TypesInfo, nodes...)
 		if err != nil {
 			log.Fatalf("failed: %s", err)
 		}
