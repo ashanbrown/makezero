@@ -12,20 +12,16 @@ import (
 )
 
 func main() {
+	log.SetFlags(0) // remove log timestamp
 
-	// Remove log timestamp
-	log.SetFlags(0)
-
-	setExitStatus := flag.Bool("set_exit_status", false, "Set exit status to 1 if any issues are found")
-	always := flag.Bool("always", false, "require every make to have zero length regardless of whether append is used")
+	setExitStatus := flag.Bool("set_exit_status", false,
+		"Set exit status to 1 if any issues are found")
+	always := flag.Bool("always", false,
+		"require every make to have zero length regardless of whether append is used")
 	flag.Parse()
 
 	cfg := packages.Config{
-		Mode: packages.NeedSyntax |
-			packages.NeedName |
-			packages.NeedFiles |
-			packages.NeedTypes |
-			packages.NeedTypesInfo,
+		Mode: packages.NeedSyntax | packages.NeedName | packages.NeedFiles | packages.NeedTypes | packages.NeedTypesInfo,
 	}
 	pkgs, err := packages.Load(&cfg, os.Args[1:]...)
 	if err != nil {
@@ -33,7 +29,7 @@ func main() {
 	}
 	linter := makezero.NewLinter(*always)
 
-	var issues []makezero.Issue
+	var issues []makezero.Issue // nolint:prealloc // don't know how many there will be
 	for _, p := range pkgs {
 		nodes := make([]ast.Node, 0, len(p.Syntax))
 		for _, n := range p.Syntax {

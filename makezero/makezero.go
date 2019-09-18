@@ -74,7 +74,7 @@ func NewLinter(initialLengthMustBeZero bool) *Linter {
 }
 
 func (l Linter) Run(fset *token.FileSet, info *types.Info, nodes ...ast.Node) ([]Issue, error) {
-	var issues []Issue
+	var issues []Issue // nolint:prealloc // don't know how many there will be
 	for _, node := range nodes {
 		var comments []*ast.CommentGroup
 		if file, ok := node.(*ast.File); ok {
@@ -107,8 +107,7 @@ func (v *visitor) Visit(node ast.Node) ast.Visitor {
 		}
 	case *ast.AssignStmt:
 		for i, right := range node.Rhs {
-			switch right := right.(type) {
-			case *ast.CallExpr:
+			if right, ok := right.(*ast.CallExpr); ok {
 				fun, ok := right.Fun.(*ast.Ident)
 				if !ok || fun.Name != "make" {
 					continue
@@ -122,7 +121,10 @@ func (v *visitor) Visit(node ast.Node) ast.Visitor {
 						break
 					}
 					if v.initLenMustBeZero && !v.hasNoLintOnSameLine(fun) {
-						v.issues = append(v.issues, MustHaveNonZeroInitLenIssue{name: v.textFor(left), position: v.fset.Position(node.Pos())})
+						v.issues = append(v.issues, MustHaveNonZeroInitLenIssue{
+							name:     v.textFor(left),
+							position: v.fset.Position(node.Pos()),
+						})
 					}
 					v.recordNonZeroLengthSlices(left)
 				}
@@ -161,9 +163,8 @@ func (v *visitor) isSlice(node ast.Node) bool {
 			if v.info != nil {
 				_, ok := v.info.ObjectOf(ident).Type().(*types.Slice)
 				return ok
-			} else {
-				return false
 			}
+			return false
 		}
 		spec, ok := obj.Decl.(*ast.TypeSpec)
 		if !ok {
@@ -178,9 +179,8 @@ func (v *visitor) isSlice(node ast.Node) bool {
 	return false
 }
 
-var nolint = regexp.MustCompile(`^\s*nozero\b`)
-
 func (v *visitor) hasNoLintOnSameLine(node ast.Node) bool {
+	var nolint = regexp.MustCompile(`^\s*nozero\b`)
 	nodePos := v.fset.Position(node.Pos())
 	for _, c := range v.comments {
 		commentPos := v.fset.Position(c.Pos())
