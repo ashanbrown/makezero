@@ -43,9 +43,6 @@ func main() {
 		if err != nil {
 			log.Fatalf("failed: %s", err)
 		}
-		if err != nil {
-			log.Fatalf("failed: %s", err)
-		}
 		issues = append(issues, newIssues...)
 	}
 
