@@ -18,7 +18,7 @@ package bar
 func foo() []int {
   x := make([]int, 5)
   append(x, 1)
-}`, `append to slice "x" with non-zero initialized length at testing.go:6:3`)
+}`, "append to slice `x` with non-zero initialized length at testing.go:6:3")
 		})
 
 		t.Run("works with custom types that are slices", func(t *testing.T) {
@@ -30,7 +30,7 @@ type intSlice []int
 func foo() {
   x := make(intSlice, 5)
   append(x, 1)
-}`, `append to slice "x" with non-zero initialized length at testing.go:7:3`)
+}`, "append to slice `x` with non-zero initialized length at testing.go:7:3")
 		})
 
 		t.Run("can report any initializes without length", func(t *testing.T) {
@@ -40,7 +40,7 @@ package bar
 
 func foo() {
   x := make([]int, 5)
-}`, `slice "x" does not have non-zero initial length at testing.go:5:3`)
+}`, "slice `x` does not have non-zero initial length at testing.go:5:3")
 		})
 
 		t.Run("doesn't confuse maps with slices", func(t *testing.T) {
@@ -62,7 +62,7 @@ func foo() {
   x := make([]int, 5) // nozero
   append(x, 1) //nozero
   append(x, 1) //nozeroxxx
-}`, `append to slice "x" with non-zero initialized length at testing.go:7:3`)
+}`, "append to slice `x` with non-zero initialized length at testing.go:7:3")
 		})
 
 	})

@@ -12,26 +12,44 @@ import (
 	"regexp"
 )
 
+type Issue interface {
+	Details() string
+	Position() token.Position
+	String() string
+}
+
 type AppendIssue struct {
 	name     string
 	position token.Position
 }
 
-func (a AppendIssue) String() string {
-	return fmt.Sprintf(`append to slice "%s" with non-zero initialized length at %s`, a.name, a.position)
+func (a AppendIssue) Details() string {
+	return fmt.Sprintf("append to slice `%s` with non-zero initialized length", a.name)
 }
+
+func (a AppendIssue) Position() token.Position {
+	return a.position
+}
+
+func (a AppendIssue) String() string { return toString(a) }
 
 type MustHaveNonZeroInitLenIssue struct {
 	name     string
 	position token.Position
 }
 
-func (a MustHaveNonZeroInitLenIssue) String() string {
-	return fmt.Sprintf(`slice "%s" does not have non-zero initial length at %s`, a.name, a.position)
+func (i MustHaveNonZeroInitLenIssue) Details() string {
+	return fmt.Sprintf("slice `%s` does not have non-zero initial length", i.name)
 }
 
-type Issue interface {
-	String() string
+func (i MustHaveNonZeroInitLenIssue) Position() token.Position {
+	return i.position
+}
+
+func (i MustHaveNonZeroInitLenIssue) String() string { return toString(i) }
+
+func toString(i Issue) string {
+	return fmt.Sprintf("%s at %s", i.Details(), i.Position())
 }
 
 type visitor struct {
