@@ -58,7 +58,7 @@ type visitor struct {
 	comments []*ast.CommentGroup // comments to apply during this visit
 	info     *types.Info
 
-	nonZeroLengthSliceDecls map[interface{}]interface{}
+	nonZeroLengthSliceDecls map[interface{}]struct{}
 	fset                    *token.FileSet
 	issues                  []Issue
 }
@@ -81,7 +81,7 @@ func (l Linter) Run(fset *token.FileSet, info *types.Info, nodes ...ast.Node) ([
 			comments = file.Comments
 		}
 		visitor := visitor{
-			nonZeroLengthSliceDecls: make(map[interface{}]interface{}),
+			nonZeroLengthSliceDecls: make(map[interface{}]struct{}),
 			initLenMustBeZero:       l.initLenMustBeZero,
 			info:                    info,
 			fset:                    fset,
@@ -143,6 +143,9 @@ func (v *visitor) textFor(node ast.Node) string {
 }
 
 func (v *visitor) hasNonZeroInitialLength(ident *ast.Ident) bool {
+	if ident.Obj == nil {
+		return false
+	}
 	_, exists := v.nonZeroLengthSliceDecls[ident.Obj.Decl]
 	return exists
 }
