@@ -144,6 +144,8 @@ func (v *visitor) textFor(node ast.Node) string {
 
 func (v *visitor) hasNonZeroInitialLength(ident *ast.Ident) bool {
 	if ident.Obj == nil {
+		log.Printf("WARNING: could not determine with %q at %s is a slice (missing object type)",
+			ident.Name, v.fset.Position(ident.Pos()).String())
 		return false
 	}
 	_, exists := v.nonZeroLengthSliceDecls[ident.Obj.Decl]
