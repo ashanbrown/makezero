@@ -26,15 +26,15 @@ Consider the case below:
 
 ```Go
 func copyNumbers(nums []int) []int {
-  values := make([]int, len(num)) // satisfy prealloc
+  values := make([]int, len(nums)) // satisfy prealloc
   for _, n := range nums {
-    values = apppend(values, n)
+    values = append(values, n)
   }
-  return values 
+  return values
 }
 ```
 
-In this case, you probably mean to preallocate with length 0 `values := make([]int, 0, len(num))`.
+In this case, you probably mean to preallocate with length 0 `values := make([]int, 0, len(nums))`.
 
 The `-always` directive enforces that slice created with `make` always have initial length of zero.  This may sound
 draconian but it encourages the use of `append` when building up arrays rather than C-style code featuring the index
@@ -42,11 +42,11 @@ variable `i` such as in:
 
 ```Go
 func copyNumbers(nums []int) []int {
-  values := make([]int, len(num))
+  values := make([]int, len(nums))
   for i, n := range nums {
     values[i] = n
   }
-  return values 
+  return values
 }
 
 ```
