@@ -79,6 +79,46 @@ func foo() {
 	})
 }
 
+func TestMultiDeclare(t *testing.T) {
+	t.Run("handles multi declares in same line", func(t *testing.T) {
+		t.Run("with just first obj is non-zero", func(t *testing.T) {
+			linter := NewLinter(false)
+			expectIssues(t, linter, `
+package bar
+
+func foo() {
+    a, b := make([]int, 10), make([]int, 0)
+    a = append(a, 10)
+    b = append(b, 10)
+}`, "append to slice `a` with non-zero initialized length at testing.go:6:9")
+		})
+
+		t.Run("with just second obj is non-zero", func(t *testing.T) {
+			linter := NewLinter(false)
+			expectIssues(t, linter, `
+package bar
+
+func foo() {
+    a, b := make([]int, 0), make([]int, 10)
+    a = append(a, 10)
+    b = append(b, 10)
+}`, "append to slice `b` with non-zero initialized length at testing.go:7:9")
+		})
+
+		t.Run("with all obj non-zero", func(t *testing.T) {
+			linter := NewLinter(false)
+			expectIssues(t, linter, `
+package bar
+
+func foo() {
+    a, b := make([]int, 10), make([]int, 10)
+    a = append(a, 10)
+    b = append(b, 10)
+}`, "append to slice `a` with non-zero initialized length at testing.go:6:9", "append to slice `b` with non-zero initialized length at testing.go:7:9")
+		})
+	})
+}
+
 func expectIssues(t *testing.T, linter *Linter, contents string, issues ...string) {
 	actualIssues := parseFile(t, linter, contents)
 	actualIssueStrs := make([]string, 0, len(actualIssues))
