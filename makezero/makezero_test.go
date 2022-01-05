@@ -80,8 +80,8 @@ func foo() {
 }
 
 func TestMultiDeclare(t *testing.T) {
-	t.Run("ignores multi declares in same line", func(t *testing.T) {
-		t.Run("with first obj is non-zero", func(t *testing.T) {
+	t.Run("handles multi declares in same line", func(t *testing.T) {
+		t.Run("with just first obj is non-zero", func(t *testing.T) {
 			linter := NewLinter(false)
 			expectIssues(t, linter, `
 package bar
@@ -93,7 +93,7 @@ func foo() {
 }`, "append to slice `a` with non-zero initialized length at testing.go:6:9")
 		})
 
-		t.Run("with second obj is non-zero", func(t *testing.T) {
+		t.Run("with just second obj is non-zero", func(t *testing.T) {
 			linter := NewLinter(false)
 			expectIssues(t, linter, `
 package bar
@@ -105,7 +105,7 @@ func foo() {
 }`, "append to slice `b` with non-zero initialized length at testing.go:7:9")
 		})
 
-		t.Run("with all obj is non-zero", func(t *testing.T) {
+		t.Run("with all obj non-zero", func(t *testing.T) {
 			linter := NewLinter(false)
 			expectIssues(t, linter, `
 package bar
