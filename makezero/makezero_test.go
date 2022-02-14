@@ -3,9 +3,8 @@ package makezero
 import (
 	"go/parser"
 	"go/token"
+	"reflect"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func TestMakeZero(t *testing.T) {
@@ -120,11 +119,14 @@ func foo() {
 
 func expectIssues(t *testing.T, linter *Linter, contents string, issues ...string) {
 	actualIssues := parseFile(t, linter, contents)
-	actualIssueStrs := make([]string, 0, len(actualIssues))
+	var actualIssueStrs []string
 	for _, i := range actualIssues {
 		actualIssueStrs = append(actualIssueStrs, i.String())
 	}
-	assert.ElementsMatch(t, issues, actualIssueStrs)
+
+	if !reflect.DeepEqual(issues, actualIssueStrs) {
+		t.Errorf("\nExpected:%v\nGot:%v\n", issues, actualIssueStrs)
+	}
 }
 
 func parseFile(t *testing.T, linter *Linter, contents string) []Issue {
