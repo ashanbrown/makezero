@@ -64,7 +64,6 @@ func foo() {
   append(x, 1) //nozeroxxx
 }`, "append to slice `x` with non-zero initialized length at testing.go:7:3")
 		})
-
 	})
 
 	t.Run("ignores more complex constructs than basic variables", func(t *testing.T) {
