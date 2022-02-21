@@ -29,7 +29,7 @@ func main() {
 	}
 	linter := makezero.NewLinter(*always)
 
-	var issues []makezero.Issue // nolint:prealloc // don't know how many there will be
+	var issues []makezero.Issue
 	for _, p := range pkgs {
 		nodes := make([]ast.Node, 0, len(p.Syntax))
 		for _, n := range p.Syntax {
