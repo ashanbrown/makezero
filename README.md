@@ -1,5 +1,7 @@
 # makezero
 
+[![CircleCI](https://circleci.com/gh/ashanbrown/makezero/tree/master.svg?style=svg)](https://circleci.com/gh/ashanbrown/makezero/tree/master)
+
 makezero is a Go static analysis tool to find slice declarations that are not initialized with zero length and are later
 used with append.
 
