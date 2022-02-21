@@ -1,0 +1,3 @@
+CURDIR/examples/example.go:6:2: slice `x` does not have non-zero initial length
+CURDIR/examples/example.go:7:6: append to slice `x` with non-zero initialized length
+exit status 3
