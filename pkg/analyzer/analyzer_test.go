@@ -22,3 +22,9 @@ func TestAlways(t *testing.T) {
 	}
 	analysistest.Run(t, testdata, a, "./always")
 }
+
+func TestAppendWithCopy(t *testing.T) {
+	testdata := analysistest.TestData()
+	a := analyzer.NewAnalyzer()
+	analysistest.Run(t, testdata, a, "./appendwithcopy")
+}

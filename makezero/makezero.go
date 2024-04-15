@@ -77,6 +77,7 @@ type visitor struct {
 	info     *types.Info
 
 	nonZeroLengthSliceDecls map[uniqDecl]struct{}
+	copyDstDecls            map[uniqDecl]struct{}
 	fset                    *token.FileSet
 	issues                  []Issue
 }
@@ -100,6 +101,7 @@ func (l Linter) Run(fset *token.FileSet, info *types.Info, nodes ...ast.Node) ([
 		}
 		visitor := visitor{
 			nonZeroLengthSliceDecls: make(map[uniqDecl]struct{}),
+			copyDstDecls:            make(map[uniqDecl]struct{}),
 			initLenMustBeZero:       l.initLenMustBeZero,
 			info:                    info,
 			fset:                    fset,
@@ -115,7 +117,15 @@ func (v *visitor) Visit(node ast.Node) ast.Visitor {
 	switch node := node.(type) {
 	case *ast.CallExpr:
 		fun, ok := node.Fun.(*ast.Ident)
-		if !ok || fun.Name != "append" {
+		if !ok {
+			break
+		}
+		if fun.Name == "copy" {
+			v.recordCopyDstSlices(node.Args[0])
+			break
+		}
+
+		if fun.Name != "append" {
 			break
 		}
 		if sliceIdent, ok := node.Args[0].(*ast.Ident); ok &&
@@ -172,11 +182,13 @@ func (v *visitor) hasNonZeroInitialLength(ident *ast.Ident) bool {
 			ident.Name, v.fset.Position(ident.Pos()).String())
 		return false
 	}
-	_, exists := v.nonZeroLengthSliceDecls[uniqDecl{
+	obj := uniqDecl{
 		varName: ident.Obj.Name,
 		decl:    ident.Obj.Decl,
-	}]
-	return exists
+	}
+	_, exists := v.nonZeroLengthSliceDecls[obj]
+	_, callCopy := v.copyDstDecls[obj]
+	return exists && !callCopy
 }
 
 func (v *visitor) recordNonZeroLengthSlices(node ast.Node) {
@@ -188,6 +200,20 @@ func (v *visitor) recordNonZeroLengthSlices(node ast.Node) {
 		return
 	}
 	v.nonZeroLengthSliceDecls[uniqDecl{
+		varName: ident.Obj.Name,
+		decl:    ident.Obj.Decl,
+	}] = struct{}{}
+}
+
+func (v *visitor) recordCopyDstSlices(node ast.Node) {
+	ident, ok := node.(*ast.Ident)
+	if !ok {
+		return
+	}
+	if ident.Obj == nil {
+		return
+	}
+	v.copyDstDecls[uniqDecl{
 		varName: ident.Obj.Name,
 		decl:    ident.Obj.Decl,
 	}] = struct{}{}
