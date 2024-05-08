@@ -10,6 +10,7 @@ import (
 	"go/types"
 	"log"
 	"regexp"
+	"strings"
 )
 
 // a decl might include multiple var,
@@ -30,10 +31,21 @@ type AppendIssue struct {
 	name     string
 	pos      token.Pos
 	position token.Position
+
+	calledFuncs []string
+	indexAssign bool
 }
 
 func (a AppendIssue) Details() string {
-	return fmt.Sprintf("append to slice `%s` with non-zero initialized length", a.name)
+	details := make([]string, 1)
+	details[0] = fmt.Sprintf("append to slice `%s` with non-zero initialized length", a.name)
+	if len(a.calledFuncs) > 0 {
+		details = append(details, fmt.Sprintf("and called by funcs: %s", strings.Join(a.calledFuncs, ",")))
+	}
+	if a.indexAssign {
+		details = append(details, "and has assigned by index")
+	}
+	return strings.Join(details, ", ")
 }
 
 func (a AppendIssue) Pos() token.Pos {
@@ -77,7 +89,8 @@ type visitor struct {
 	info     *types.Info
 
 	nonZeroLengthSliceDecls map[uniqDecl]struct{}
-	copyDstDecls            map[uniqDecl]struct{}
+	funcCallDecls           map[uniqDecl][]string
+	indexAssignDecls        map[uniqDecl]bool
 	fset                    *token.FileSet
 	issues                  []Issue
 }
@@ -101,7 +114,8 @@ func (l Linter) Run(fset *token.FileSet, info *types.Info, nodes ...ast.Node) ([
 		}
 		visitor := visitor{
 			nonZeroLengthSliceDecls: make(map[uniqDecl]struct{}),
-			copyDstDecls:            make(map[uniqDecl]struct{}),
+			funcCallDecls:           make(map[uniqDecl][]string),
+			indexAssignDecls:        make(map[uniqDecl]bool),
 			initLenMustBeZero:       l.initLenMustBeZero,
 			info:                    info,
 			fset:                    fset,
@@ -116,29 +130,28 @@ func (l Linter) Run(fset *token.FileSet, info *types.Info, nodes ...ast.Node) ([
 func (v *visitor) Visit(node ast.Node) ast.Visitor {
 	switch node := node.(type) {
 	case *ast.CallExpr:
-		fun, ok := node.Fun.(*ast.Ident)
-		if !ok {
-			break
-		}
-		if fun.Name == "copy" {
-			v.recordCopyDstSlices(node.Args[0])
+		fun, isAppend := v.isAppendFunc(node)
+		if !isAppend {
+			v.recordFuncCall(node)
 			break
 		}
 
-		if fun.Name != "append" {
-			break
-		}
-		if sliceIdent, ok := node.Args[0].(*ast.Ident); ok &&
-			v.hasNonZeroInitialLength(sliceIdent) &&
-			!v.hasNoLintOnSameLine(fun) {
-			v.issues = append(v.issues,
-				AppendIssue{
-					name:     sliceIdent.Name,
-					pos:      fun.Pos(),
-					position: v.fset.Position(fun.Pos()),
-				})
+		if sliceIdent, ok := node.Args[0].(*ast.Ident); ok {
+			obj, ok := v.hasNonZeroInitialLength(sliceIdent)
+			if ok && !v.hasNoLintOnSameLine(fun) {
+				v.issues = append(v.issues,
+					AppendIssue{
+						name:     sliceIdent.Name,
+						pos:      fun.Pos(),
+						position: v.fset.Position(fun.Pos()),
+
+						calledFuncs: v.funcCallDecls[obj],
+						indexAssign: v.indexAssignDecls[obj],
+					})
+			}
 		}
 	case *ast.AssignStmt:
+		v.recordIndexAssign(node)
 		for i, right := range node.Rhs {
 			if right, ok := right.(*ast.CallExpr); ok {
 				fun, ok := right.Fun.(*ast.Ident)
@@ -176,47 +189,78 @@ func (v *visitor) textFor(node ast.Node) string {
 	return typeBuf.String()
 }
 
-func (v *visitor) hasNonZeroInitialLength(ident *ast.Ident) bool {
-	if ident.Obj == nil {
-		log.Printf("WARNING: could not determine with %q at %s is a slice (missing object type)",
-			ident.Name, v.fset.Position(ident.Pos()).String())
-		return false
+func (v *visitor) getIdentDecl(node ast.Node) (uniqDecl, bool) {
+	ident, ok := node.(*ast.Ident)
+	if !ok {
+		return uniqDecl{}, false
 	}
-	obj := uniqDecl{
+	if ident.Obj == nil {
+		return uniqDecl{}, false
+	}
+	return uniqDecl{
 		varName: ident.Obj.Name,
 		decl:    ident.Obj.Decl,
+	}, true
+}
+
+func (v *visitor) hasNonZeroInitialLength(ident *ast.Ident) (uniqDecl, bool) {
+	obj, ok := v.getIdentDecl(ident)
+	if !ok {
+		log.Printf("WARNING: could not determine with %q at %s is a slice (missing object type)",
+			ident.Name, v.fset.Position(ident.Pos()).String())
+		return uniqDecl{}, false
 	}
 	_, exists := v.nonZeroLengthSliceDecls[obj]
-	_, callCopy := v.copyDstDecls[obj]
-	return exists && !callCopy
+	return obj, exists
 }
 
 func (v *visitor) recordNonZeroLengthSlices(node ast.Node) {
-	ident, ok := node.(*ast.Ident)
+	obj, ok := v.getIdentDecl(node)
 	if !ok {
 		return
 	}
-	if ident.Obj == nil {
-		return
-	}
-	v.nonZeroLengthSliceDecls[uniqDecl{
-		varName: ident.Obj.Name,
-		decl:    ident.Obj.Decl,
-	}] = struct{}{}
+	v.nonZeroLengthSliceDecls[obj] = struct{}{}
 }
 
-func (v *visitor) recordCopyDstSlices(node ast.Node) {
-	ident, ok := node.(*ast.Ident)
+func (v *visitor) recordFuncCall(node *ast.CallExpr) {
+	funcName := v.textFor(node.Fun)
+	for _, arg := range node.Args {
+		obj, ok := v.getIdentDecl(arg)
+		if !ok {
+			continue
+		}
+		v.funcCallDecls[obj] = append(v.funcCallDecls[obj], funcName)
+	}
+}
+
+func (v *visitor) isAppendFunc(node *ast.CallExpr) (fun *ast.Ident, ok bool) {
+	fun, ok = node.Fun.(*ast.Ident)
 	if !ok {
-		return
+		return nil, false
 	}
-	if ident.Obj == nil {
-		return
+	if fun.Name != "append" {
+		return nil, false
 	}
-	v.copyDstDecls[uniqDecl{
-		varName: ident.Obj.Name,
-		decl:    ident.Obj.Decl,
-	}] = struct{}{}
+	return fun, true
+}
+
+func (v *visitor) recordIndexAssign(node *ast.AssignStmt) {
+	for _, left := range node.Lhs {
+		var x ast.Expr
+		switch expr := left.(type) {
+		case *ast.IndexExpr:
+			x = expr.X
+		case *ast.IndexListExpr:
+			x = expr.X
+		}
+		if x == nil {
+			continue
+		}
+		obj, ok := v.getIdentDecl(x)
+		if ok {
+			v.indexAssignDecls[obj] = true
+		}
+	}
 }
 
 func (v *visitor) isSlice(node ast.Node) bool {
