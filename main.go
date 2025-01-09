@@ -8,7 +8,7 @@ import (
 
 	"golang.org/x/tools/go/packages"
 
-	"github.com/ashanbrown/makezero/makezero"
+	"github.com/ashanbrown/makezero/v2/makezero"
 )
 
 func main() {

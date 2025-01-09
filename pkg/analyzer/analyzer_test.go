@@ -3,7 +3,7 @@ package analyzer_test
 import (
 	"testing"
 
-	"github.com/ashanbrown/makezero/pkg/analyzer"
+	"github.com/ashanbrown/makezero/v2/pkg/analyzer"
 	"golang.org/x/tools/go/analysis/analysistest"
 )
 
