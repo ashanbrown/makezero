@@ -1,6 +1,6 @@
 # makezero
 
-[![GitHubCI](https://github.com/ashanbrown/makezero/actions/workflows/build.yml/badge.svg)](https://github.com/ashanbrown/makezero/actions/workflows/build.yml/) 
+[![GitHubCI](https://github.com/ashanbrown/makezero/actions/workflows/build.yml/badge.svg)](https://github.com/ashanbrown/makezero/actions/workflows/build.yml/)
 
 makezero is a Go static analysis tool to find slice declarations that are not initialized with zero length and are later
 used with append.
