@@ -10,7 +10,7 @@ import (
 func TestAppend(t *testing.T) {
 	testdata := analysistest.TestData()
 	a := analyzer.NewAnalyzer()
-	analysistest.Run(t, testdata, a, "./append")
+	analysistest.Run(t, testdata, a, "./src/append")
 }
 
 func TestAlways(t *testing.T) {
@@ -20,5 +20,5 @@ func TestAlways(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error but got %q", err)
 	}
-	analysistest.Run(t, testdata, a, "./always")
+	analysistest.Run(t, testdata, a, "./src/always")
 }
