@@ -23,7 +23,13 @@ func main() {
 	cfg := packages.Config{
 		Mode: packages.NeedSyntax | packages.NeedName | packages.NeedFiles | packages.NeedTypes | packages.NeedTypesInfo,
 	}
-	pkgs, err := packages.Load(&cfg, os.Args[1:]...)
+
+	pkgPatterns := os.Args[1:]
+	if len(pkgPatterns) == 0 {
+		log.Fatalf("At least one package must be specified")
+	}
+
+	pkgs, err := packages.Load(&cfg, pkgPatterns...)
 	if err != nil {
 		log.Fatalf("Could not load packages: %s", err)
 	}
